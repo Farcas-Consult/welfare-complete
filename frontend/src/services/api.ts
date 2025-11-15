@@ -3,7 +3,7 @@ import { store } from '../store/store';
 import { setTokens, logout, setUserProfile } from '../store/slices/authSlice';
 import { authService } from './authService';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API_URL = 'http://3.6.115.190:3001';
 
 const api = axios.create({
   baseURL: `${API_URL}/api/v1`,
