@@ -1,0 +1,9 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/yourusername/welfare-complete/wiki
+    about: Check the documentation for answers
+  - name: Discussions
+    url: https://github.com/yourusername/welfare-complete/discussions
+    about: Ask questions and discuss with the community
+
