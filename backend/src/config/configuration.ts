@@ -70,7 +70,7 @@ export default () => ({
   },
   
   cors: {
-    origins: process.env.CORS_ORIGINS || 'http://localhost:3000',
+    origins: process.env.CORS_ORIGINS || 'http://localhost:3000,http://3.6.115.190:3002',
   },
   
   rateLimit: {
