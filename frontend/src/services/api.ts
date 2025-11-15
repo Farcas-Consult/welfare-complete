@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { store } from '../store/store';
+import { setTokens, logout, setUserProfile } from '../store/slices/authSlice';
+import { authService } from './authService';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -36,9 +38,45 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      // In a functional application, this is where you'd dispatch a refresh token action
-      // to automatically get a new access token and retry the original request.
-      console.warn('Access token expired. Attempting refresh token flow (logic placeholder).');
+      try {
+        const state = store.getState();
+        const refreshToken = state.auth.refreshToken;
+
+        if (refreshToken) {
+          const response = await authService.refreshToken({ refreshToken });
+          // Handle both wrapped and unwrapped response structures
+          const responseData: any = (response.data as any)?.data || response.data;
+          const { accessToken, refreshToken: newRefreshToken, user } = responseData;
+
+          if (accessToken && newRefreshToken) {
+            store.dispatch(setTokens({ accessToken, refreshToken: newRefreshToken }));
+            if (user) {
+              store.dispatch(setUserProfile({
+                id: user.id || '',
+                email: user.email || '',
+                role: (user.role || 'member') as 'member' | 'treasurer' | 'secretary' | 'committee' | 'admin' | 'auditor',
+                firstName: user.firstName || '',
+                lastName: user.lastName || '',
+                memberNo: user.memberNo || '',
+              }));
+            }
+          }
+
+          // Retry the original request with new token
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          return api(originalRequest);
+        } else {
+          // No refresh token, logout user
+          store.dispatch(logout());
+          window.location.href = '/login';
+          return Promise.reject(error);
+        }
+      } catch (refreshError) {
+        // Refresh failed, logout user
+        store.dispatch(logout());
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
     }
 
     return Promise.reject(error);

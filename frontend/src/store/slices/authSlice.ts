@@ -18,14 +18,21 @@ export interface AuthState {
   error: string | null;
 }
 
-const initialState: AuthState = {
-  isAuthenticated: false,
-  accessToken: localStorage.getItem('accessToken') || null,
-  refreshToken: localStorage.getItem('refreshToken') || null,
-  user: null,
-  status: 'idle',
-  error: null,
+const getInitialState = (): AuthState => {
+  const accessToken = localStorage.getItem('accessToken');
+  const refreshToken = localStorage.getItem('refreshToken');
+  
+  return {
+    isAuthenticated: !!(accessToken && refreshToken),
+    accessToken: accessToken || null,
+    refreshToken: refreshToken || null,
+    user: null,
+    status: !!(accessToken && refreshToken) ? 'succeeded' : 'idle',
+    error: null,
+  };
 };
+
+const initialState: AuthState = getInitialState();
 
 const authSlice = createSlice({
   name: 'auth',
