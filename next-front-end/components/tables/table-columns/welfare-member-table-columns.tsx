@@ -4,9 +4,17 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ColumnDef } from "@tanstack/react-table";
 import { DragHandle } from "@/components/tables/components/drag-handle";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Eye, Edit, Trash2 } from "lucide-react";
+import {
+  MoreHorizontal,
+  Eye,
+  Edit,
+  Trash2,
+  Ban,
+  Check,
+  Loader2,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +25,22 @@ import {
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { useState } from "react";
-import type { WelfareMember } from "@/app/members/types/member-types";
+import type { MouseEvent } from "react";
+import type { WelfareMember } from "@/app/(roles)/dashboard/admin/members/types/member-types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  useDeleteMember,
+  useUpdateMemberStatus,
+} from "@/app/(roles)/dashboard/admin/members/hooks/useMembersHook";
 
 // Helper function to get status color
 const getStatusColor = (status: string) => {
@@ -35,24 +58,48 @@ const getStatusColor = (status: string) => {
   }
 };
 
-export const useWelfareMemberColumns = (): ColumnDef<WelfareMember>[] => {
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [memberToDelete, setMemberToDelete] = useState<WelfareMember | null>(
-    null
-  );
+type DialogState =
+  | { type: "delete"; member: WelfareMember }
+  | {
+      type: "status";
+      member: WelfareMember;
+      targetStatus: WelfareMember["status"];
+    }
+  | null;
 
-  const handleDeleteClick = (member: WelfareMember) => {
-    setMemberToDelete(member);
-    setDeleteDialogOpen(true);
+export const useWelfareMemberColumns = (): ColumnDef<WelfareMember>[] => {
+  const [dialogState, setDialogState] = useState<DialogState>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { mutateAsync: updateStatus } = useUpdateMemberStatus();
+  const { mutateAsync: deleteMember } = useDeleteMember();
+
+  const closeDialog = () => {
+    if (!isProcessing) {
+      setDialogState(null);
+    }
   };
 
-  const handleConfirmDelete = () => {
-    if (memberToDelete) {
-      // TODO: Implement delete mutation
-      console.log("Delete member:", memberToDelete.id);
-      setDeleteDialogOpen(false);
-      setMemberToDelete(null);
+  const confirmAction = async () => {
+    if (!dialogState) return;
+    setIsProcessing(true);
+    try {
+      if (dialogState.type === "delete") {
+        await deleteMember(dialogState.member.id);
+      } else if (dialogState.type === "status") {
+        await updateStatus({
+          id: dialogState.member.id,
+          status: dialogState.targetStatus,
+        });
+      }
+      setDialogState(null);
+    } finally {
+      setIsProcessing(false);
     }
+  };
+
+  const handleConfirmClick = async (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    await confirmAction();
   };
 
   return [
@@ -185,7 +232,7 @@ export const useWelfareMemberColumns = (): ColumnDef<WelfareMember>[] => {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link
-                    href={`/members/${member.id}`}
+                    href={`/dashboard/admin/members/${member.id}`}
                     className="cursor-pointer"
                   >
                     <Eye className="mr-2 h-4 w-4" />
@@ -194,23 +241,104 @@ export const useWelfareMemberColumns = (): ColumnDef<WelfareMember>[] => {
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link
-                    href={`/members/${member.id}?edit=true`}
+                    href={`/dashboard/admin/members/${member.id}/edit`}
                     className="cursor-pointer"
                   >
                     <Edit className="mr-2 h-4 w-4" />
                     Edit Member
                   </Link>
                 </DropdownMenuItem>
+                {member.status !== "active" ? (
+                  <DropdownMenuItem
+                    className="cursor-pointer"
+                    onClick={() =>
+                      setDialogState({
+                        type: "status",
+                        member,
+                        targetStatus: "active",
+                      })
+                    }
+                  >
+                    <Check className="mr-2 h-4 w-4" />
+                    Activate
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    className="cursor-pointer"
+                    onClick={() =>
+                      setDialogState({
+                        type: "status",
+                        member,
+                        targetStatus: "inactive",
+                      })
+                    }
+                  >
+                    <Ban className="mr-2 h-4 w-4" />
+                    Deactivate
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-red-600 cursor-pointer"
-                  onClick={() => handleDeleteClick(member)}
+                  onClick={() => setDialogState({ type: "delete", member })}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete Member
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <AlertDialog
+              open={dialogState !== null && dialogState.member.id === member.id}
+              onOpenChange={(open: boolean) => {
+                if (!open && dialogState?.member.id === member.id) {
+                  closeDialog();
+                }
+              }}
+            >
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {dialogState?.type === "delete"
+                      ? "Delete member?"
+                      : dialogState?.targetStatus === "active"
+                      ? "Activate member?"
+                      : "Deactivate member?"}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {dialogState?.type === "delete"
+                      ? `This will permanently remove ${dialogState.member?.firstName} from the system.`
+                      : dialogState?.targetStatus === "active"
+                      ? "The member will regain access immediately."
+                      : "The member will be marked as inactive and lose access until reactivated."}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isProcessing}>
+                    Cancel
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleConfirmClick}
+                    disabled={isProcessing}
+                    className="gap-2"
+                  >
+                    {isProcessing && (
+                      <Loader2 className="size-4 animate-spin" />
+                    )}
+                    {dialogState?.type === "delete"
+                      ? isProcessing
+                        ? "Deleting..."
+                        : "Delete"
+                      : dialogState?.targetStatus === "active"
+                      ? isProcessing
+                        ? "Activating..."
+                        : "Activate"
+                      : isProcessing
+                      ? "Deactivating..."
+                      : "Deactivate"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </>
         );
       },

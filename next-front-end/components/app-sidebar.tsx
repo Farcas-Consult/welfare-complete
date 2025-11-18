@@ -48,10 +48,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              className="data-[slot=sidebar-menu-button]:!p-1.5"
+              className="data-[slot=sidebar-menu-button]:p-1.5!"
             >
               <Link href={dashboardUrl}>
-                <IconShield className="!size-6" />
+                <IconShield className="size-6!" />
                 <span className="text-lg font-semibold">Welfare System</span>
               </Link>
             </SidebarMenuButton>
@@ -74,7 +74,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     <SidebarMenuButton
                       asChild
                       tooltip={item.title}
-                      isActive={pathname?.startsWith(item.url)}
+                      isActive={
+                        pathname === item.url ||
+                        pathname?.startsWith(`${item.url}/`)
+                      }
                     >
                       <Link href={item.url}>
                         <item.icon />

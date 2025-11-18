@@ -78,8 +78,6 @@ export function GenericTable<T>({
   initialFilters = [],
   initialVisibility = {},
   initialPageSize = 10,
-  onRowClick,
-  renderRow,
   pagination,
   pending,
   role,
@@ -88,6 +86,8 @@ export function GenericTable<T>({
   tableFilters,
   withFilters = true,
   withPagination = true,
+  showToolbar = true,
+  showCreateButton = true,
 }: TableProps<T>) {
   const [sorting, setSorting] = React.useState<SortingState>(initialSorting);
   const [columnFilters, setColumnFilters] =
@@ -139,100 +139,98 @@ export function GenericTable<T>({
         defaultValue="visits"
         className="w-full flex-col justify-start gap-6 "
       >
-        <div className="flex flex-wrap gap-3 @container/table-header items-center justify-between px-4 lg:px-6">
-          <Label htmlFor="view-selector" className="sr-only">
-            View
-          </Label>
+        {showToolbar && (
+          <div className="flex flex-wrap gap-3 @container/table-header items-center justify-between px-4 lg:px-6">
+            <Label htmlFor="view-selector" className="sr-only">
+              View
+            </Label>
 
-          {/* Left side - can be used for filters or other content */}
-          <div className="flex items-center gap-2">
-            {/* Placeholder for future left-side content */}
+            <div className="flex items-center gap-2" />
+
+            <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <IconLayoutColumns />
+                    <span className="hidden lg:inline">Customize Columns</span>
+                    <span className="lg:hidden">Columns</span>
+                    <IconChevronDown />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  {table
+                    .getAllColumns()
+                    .filter(
+                      (column) =>
+                        typeof column.accessorFn !== "undefined" &&
+                        column.getCanHide()
+                    )
+                    .map((column) => {
+                      return (
+                        <DropdownMenuCheckboxItem
+                          key={column.id}
+                          className="capitalize"
+                          checked={column.getIsVisible()}
+                          onCheckedChange={(value) =>
+                            column.toggleVisibility(!!value)
+                          }
+                        >
+                          {column.id}
+                        </DropdownMenuCheckboxItem>
+                      );
+                    })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {showCreateButton &&
+                (tableType === "welfare_member" ? (
+                  <Button asChild>
+                    <Link href="/dashboard/admin/members/create">
+                      <IconPlus />
+                      Add Member
+                    </Link>
+                  </Button>
+                ) : tableType === "member" ? (
+                  <Button asChild>
+                    <Link href="/dashboard/members/new">
+                      <IconPlus />
+                      Add Gym Member
+                    </Link>
+                  </Button>
+                ) : tableType === "staff" ? (
+                  <Button asChild>
+                    <Link href="/dashboard/staff/new">
+                      <IconPlus />
+                      Add Staff
+                    </Link>
+                  </Button>
+                ) : tableType === "subscription_plan" &&
+                  (role === "admin" || role === "superadmin") ? (
+                  <Button asChild>
+                    <Link href="/dashboard/membership-plans/new">
+                      <IconPlus />
+                      Add Subscription Plan
+                    </Link>
+                  </Button>
+                ) : tableType === "gym_class" ? (
+                  <Button asChild>
+                    <Link href="/dashboard/classes/new">
+                      <IconPlus />
+                      Add Gym Class
+                    </Link>
+                  </Button>
+                ) : tableType === "locker_plan" &&
+                  (role === "admin" || role === "superadmin") ? (
+                  <Button asChild>
+                    <Link href="/dashboard/lockers/plans/new">
+                      <IconPlus />
+                      Add Locker Plan
+                    </Link>
+                  </Button>
+                ) : null)}
+            </div>
           </div>
-
-          {/* Right side - Customize Columns and Add buttons */}
-          <div className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <IconLayoutColumns />
-                  <span className="hidden lg:inline">Customize Columns</span>
-                  <span className="lg:hidden">Columns</span>
-                  <IconChevronDown />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                {table
-                  .getAllColumns()
-                  .filter(
-                    (column) =>
-                      typeof column.accessorFn !== "undefined" &&
-                      column.getCanHide()
-                  )
-                  .map((column) => {
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={column.id}
-                        className="capitalize"
-                        checked={column.getIsVisible()}
-                        onCheckedChange={(value) =>
-                          column.toggleVisibility(!!value)
-                        }
-                      >
-                        {column.id}
-                      </DropdownMenuCheckboxItem>
-                    );
-                  })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/*  Button with a link  to the form  based on the tableType*/}
-            {tableType === "welfare_member" ? (
-              <Button asChild>
-                <Link href="/members/new">
-                  <IconPlus />
-                  Add Member
-                </Link>
-              </Button>
-            ) : tableType === "member" ? (
-              <Button asChild>
-                <Link href="/dashboard/members/new">
-                  <IconPlus />
-                  Add Gym Member
-                </Link>
-              </Button>
-            ) : tableType === "staff" ? (
-              <Button asChild>
-                <Link href="/dashboard/staff/new">
-                  <IconPlus />
-                  Add Staff
-                </Link>
-              </Button>
-            ) : tableType === "subscription_plan" &&
-              (role === "admin" || role === "superadmin") ? (
-              <Button asChild>
-                <Link href="/dashboard/membership-plans/new">
-                  <IconPlus />
-                  Add Subscription Plan
-                </Link>
-              </Button>
-            ) : tableType === "gym_class" ? (
-              <Button asChild>
-                <Link href="/dashboard/classes/new">
-                  <IconPlus />
-                  Add Gym Class
-                </Link>
-              </Button>
-            ) : tableType === "locker_plan" &&
-              (role === "admin" || role === "superadmin") ? (
-              <Button asChild>
-                <Link href="/dashboard/lockers/plans/new">
-                  <IconPlus />
-                  Add Locker Plan
-                </Link>
-              </Button>
-            ) : null}
-          </div>
-        </div>
+        )}
         {pending ? (
           <TableSkeleton />
         ) : (

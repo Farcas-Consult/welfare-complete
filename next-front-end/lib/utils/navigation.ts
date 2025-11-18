@@ -30,7 +30,7 @@ export const getMainNavItems = (role?: WelfareRole): NavItem[] => {
     },
     {
       title: "Members",
-      url: "/members",
+      url: "/dashboard/admin/members",
       icon: IconUsers,
       roles: ["admin", "treasurer", "secretary", "committee"],
     },

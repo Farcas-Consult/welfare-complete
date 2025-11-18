@@ -4,21 +4,10 @@ import React from "react";
 import { CSS } from "@dnd-kit/utilities";
 import { TableCell, TableRow } from "../ui/table";
 
-export function DraggableRow<T>({
-  row,
-  renderRow,
-}: {
-  row: Row<T>;
-  renderRow?: (
-    row: Row<T>,
-    dragProps: { isDragging: boolean; transform?: string; transition?: string }
-  ) => React.ReactNode;
-}) {
+export function DraggableRow<T>({ row }: { row: Row<T> }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.id,
   });
-
-  if (renderRow) return renderRow(row, { isDragging, transform: CSS.Transform.toString(transform), transition });
 
   return (
     <TableRow

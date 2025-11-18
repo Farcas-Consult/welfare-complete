@@ -1,7 +1,6 @@
 import {
   ColumnDef,
   ColumnFiltersState,
-  Row,
   SortingState,
   VisibilityState,
 } from "@tanstack/react-table";
@@ -28,7 +27,11 @@ export type TableTypes =
   | "claim"
   | "loan"
   | "contribution"
-  | "meeting";
+  | "meeting"
+  | "admin_members"
+  | "admin_claims"
+  | "admin_meetings"
+  | "admin_loans";
 
 export type TableProps<T> = {
   data: T[];
@@ -49,15 +52,11 @@ export type TableProps<T> = {
   initialVisibility?: VisibilityState;
   initialPageSize?: number;
   role: WelfareRole | string; // Allow string for backward compatibility with gym roles
-  onRowClick?: (row: Row<T>) => void;
-  // For drag and drop support, render rows yourself
-  renderRow?: (
-    row: Row<T>,
-    props: { isDragging: boolean; transform?: string; transition?: string }
-  ) => React.ReactNode;
   pending: boolean;
   tableType?: TableTypes;
   tableFilters?: string[];
   withFilters?: boolean;
   withPagination?: boolean;
+  showToolbar?: boolean;
+  showCreateButton?: boolean;
 };
