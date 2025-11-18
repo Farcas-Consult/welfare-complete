@@ -1,10 +1,15 @@
 # Development stage
 FROM node:18-alpine AS development
 
+# Install build dependencies for native modules (bcrypt, etc.)
+RUN apk add --no-cache python3 make g++
+
 WORKDIR /app
 
-# Copy package files
+# Copy package files and lock file
 COPY package*.json ./
+COPY package-lock.json ./
+COPY .npmrc* ./
 COPY tsconfig*.json ./
 
 # Install all dependencies
@@ -17,15 +22,20 @@ COPY . .
 EXPOSE 3001
 
 # Start development server
-CMD ["npm", "run", "start:dev"]
+CMD ["pnpm", "run", "start:dev"]
 
 # Builder stage
 FROM node:18-alpine AS builder
 
+# Install build dependencies for native modules (bcrypt, etc.)
+RUN apk add --no-cache python3 make g++
+
 WORKDIR /app
 
-# Copy package files
+# Copy package files and lock file
 COPY package*.json ./
+COPY package-lock.json ./
+COPY .npmrc* ./
 COPY tsconfig*.json ./
 
 # Install all dependencies
@@ -40,8 +50,8 @@ RUN npm run build
 # Production stage
 FROM node:18-alpine AS production
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install dumb-init and build dependencies for native modules
+RUN apk add --no-cache dumb-init python3 make g++
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
@@ -49,10 +59,16 @@ RUN addgroup -g 1001 -S nodejs && \
 
 WORKDIR /app
 
-# Copy package files and install production dependencies only
+# Copy package files and lock file
 COPY package*.json ./
-RUN npm ci --only=production && \
-    npm cache clean --force
+COPY package-lock.json ./
+COPY .npmrc* ./
+
+# Install production dependencies only (with build tools for native modules)
+RUN npm ci --omit=dev
+
+# Remove build dependencies after installation to reduce image size
+RUN apk del python3 make g++
 
 # Copy built application from builder stage
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist

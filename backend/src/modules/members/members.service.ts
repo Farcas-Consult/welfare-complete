@@ -1,11 +1,15 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Member } from './entities/member.entity';
-import { Dependent } from './entities/dependent.entity';
-import { CreateMemberDto } from './dto/create-member.dto';
-import { UpdateMemberDto } from './dto/update-member.dto';
-import { CreateDependentDto } from './dto/create-dependent.dto';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { FindOptionsWhere, Repository } from "typeorm";
+import { Member } from "./entities/member.entity";
+import { Dependent } from "./entities/dependent.entity";
+import { CreateMemberDto } from "./dto/create-member.dto";
+import { UpdateMemberDto } from "./dto/update-member.dto";
+import { CreateDependentDto } from "./dto/create-dependent.dto";
 
 @Injectable()
 export class MembersService {
@@ -13,7 +17,7 @@ export class MembersService {
     @InjectRepository(Member)
     private memberRepository: Repository<Member>,
     @InjectRepository(Dependent)
-    private dependentRepository: Repository<Dependent>,
+    private dependentRepository: Repository<Dependent>
   ) {}
 
   async create(createMemberDto: CreateMemberDto) {
@@ -28,25 +32,46 @@ export class MembersService {
     const savedMember = await this.memberRepository.save(member);
 
     return {
-      message: 'Member created successfully',
+      message: "Member created successfully",
       data: savedMember,
     };
+  }
+
+  async findByEmailOrPhone(email?: string, phonePrimary?: string) {
+    if (!email && !phonePrimary) {
+      return null;
+    }
+
+    const where: FindOptionsWhere<Member>[] = [];
+
+    if (email) {
+      where.push({ email });
+    }
+
+    if (phonePrimary) {
+      where.push({ phonePrimary });
+    }
+
+    return this.memberRepository.findOne({
+      where,
+      relations: ["user"],
+    });
   }
 
   async findAll(query: any) {
     const { page = 1, limit = 10, status, search } = query;
     const skip = (page - 1) * limit;
 
-    const queryBuilder = this.memberRepository.createQueryBuilder('member');
+    const queryBuilder = this.memberRepository.createQueryBuilder("member");
 
     if (status) {
-      queryBuilder.where('member.status = :status', { status });
+      queryBuilder.where("member.status = :status", { status });
     }
 
     if (search) {
       queryBuilder.andWhere(
-        '(member.firstName ILIKE :search OR member.lastName ILIKE :search OR member.memberNo ILIKE :search)',
-        { search: `%${search}%` },
+        "(member.firstName ILIKE :search OR member.lastName ILIKE :search OR member.memberNo ILIKE :search)",
+        { search: `%${search}%` }
       );
     }
 
@@ -56,7 +81,7 @@ export class MembersService {
       .getManyAndCount();
 
     return {
-      message: 'Members retrieved successfully',
+      message: "Members retrieved successfully",
       data: {
         members,
         pagination: {
@@ -72,15 +97,15 @@ export class MembersService {
   async findOne(id: string) {
     const member = await this.memberRepository.findOne({
       where: { id },
-      relations: ['dependents', 'user'],
+      relations: ["dependents", "user"],
     });
 
     if (!member) {
-      throw new NotFoundException('Member not found');
+      throw new NotFoundException("Member not found");
     }
 
     return {
-      message: 'Member retrieved successfully',
+      message: "Member retrieved successfully",
       data: member,
     };
   }
@@ -89,14 +114,14 @@ export class MembersService {
     const member = await this.memberRepository.findOne({ where: { id } });
 
     if (!member) {
-      throw new NotFoundException('Member not found');
+      throw new NotFoundException("Member not found");
     }
 
     Object.assign(member, updateMemberDto);
     const updatedMember = await this.memberRepository.save(member);
 
     return {
-      message: 'Member updated successfully',
+      message: "Member updated successfully",
       data: updatedMember,
     };
   }
@@ -105,21 +130,23 @@ export class MembersService {
     const member = await this.memberRepository.findOne({ where: { id } });
 
     if (!member) {
-      throw new NotFoundException('Member not found');
+      throw new NotFoundException("Member not found");
     }
 
     await this.memberRepository.remove(member);
 
     return {
-      message: 'Member deleted successfully',
+      message: "Member deleted successfully",
     };
   }
 
   async addDependent(memberId: string, createDependentDto: CreateDependentDto) {
-    const member = await this.memberRepository.findOne({ where: { id: memberId } });
+    const member = await this.memberRepository.findOne({
+      where: { id: memberId },
+    });
 
     if (!member) {
-      throw new NotFoundException('Member not found');
+      throw new NotFoundException("Member not found");
     }
 
     const dependent = this.dependentRepository.create({
@@ -130,7 +157,7 @@ export class MembersService {
     const savedDependent = await this.dependentRepository.save(dependent);
 
     return {
-      message: 'Dependent added successfully',
+      message: "Dependent added successfully",
       data: savedDependent,
     };
   }
@@ -138,15 +165,15 @@ export class MembersService {
   async getDependents(memberId: string) {
     const member = await this.memberRepository.findOne({
       where: { id: memberId },
-      relations: ['dependents'],
+      relations: ["dependents"],
     });
 
     if (!member) {
-      throw new NotFoundException('Member not found');
+      throw new NotFoundException("Member not found");
     }
 
     return {
-      message: 'Dependents retrieved successfully',
+      message: "Dependents retrieved successfully",
       data: member.dependents,
     };
   }
@@ -154,13 +181,12 @@ export class MembersService {
   private async generateMemberNo(): Promise<string> {
     const year = new Date().getFullYear();
     const yearPrefix = String(year);
-    
+
     const count = await this.memberRepository
-      .createQueryBuilder('member')
-      .where('member.memberNo LIKE :prefix', { prefix: `${yearPrefix}%` })
+      .createQueryBuilder("member")
+      .where("member.memberNo LIKE :prefix", { prefix: `${yearPrefix}%` })
       .getCount();
 
-    return `${yearPrefix}${String(count + 1).padStart(4, '0')}`;
+    return `${yearPrefix}${String(count + 1).padStart(4, "0")}`;
   }
 }
-

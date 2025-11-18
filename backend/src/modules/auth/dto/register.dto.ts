@@ -19,6 +19,11 @@ export class RegisterDto {
   })
   password: string;
 
+  @ApiProperty({ example: '+254711223344' })
+  @IsString()
+  @MinLength(7)
+  phonePrimary: string;
+
   @ApiProperty({ example: 'John', required: false })
   @IsOptional()
   @IsString()

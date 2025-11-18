@@ -20,12 +20,19 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { HealthModule } from './modules/health/health.module';
 import { StorageModule } from './modules/storage/storage.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 // Configuration
 import configuration from './config/configuration';
 
+// Database Seed
+import { SeedService } from './database/seed.service';
+import { User } from './modules/auth/entities/user.entity';
+
 @Module({
   imports: [
+    // Database entities for seeding
+    TypeOrmModule.forFeature([User]),
     // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
@@ -107,8 +114,9 @@ import configuration from './config/configuration';
     AuditModule,
     HealthModule,
     StorageModule,
+    DashboardModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [SeedService],
 })
 export class AppModule {}

@@ -3,18 +3,19 @@ import {
   UnauthorizedException,
   BadRequestException,
   NotFoundException,
-} from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcrypt';
-import { v4 as uuidv4 } from 'uuid';
-import { User } from './entities/user.entity';
-import { RefreshToken } from './entities/refresh-token.entity';
-import { RegisterDto } from './dto/register.dto';
-import { ChangePasswordDto } from './dto/change-password.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
+} from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { ConfigService } from "@nestjs/config";
+import * as bcrypt from "bcryptjs";
+import { v4 as uuidv4 } from "uuid";
+import { User } from "./entities/user.entity";
+import { RefreshToken } from "./entities/refresh-token.entity";
+import { RegisterDto } from "./dto/register.dto";
+import { ChangePasswordDto } from "./dto/change-password.dto";
+import { ResetPasswordDto } from "./dto/reset-password.dto";
+import { MembersService } from "../members/members.service";
 
 @Injectable()
 export class AuthService {
@@ -25,41 +26,85 @@ export class AuthService {
     private refreshTokenRepository: Repository<RefreshToken>,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private membersService: MembersService
   ) {}
 
   async register(registerDto: RegisterDto) {
     const existingUser = await this.userRepository.findOne({
-      where: [
-        { email: registerDto.email },
-        { username: registerDto.username },
-      ],
+      where: [{ email: registerDto.email }, { username: registerDto.username }],
     });
 
     if (existingUser) {
-      throw new BadRequestException('User with this email or username already exists');
+      throw new BadRequestException(
+        "User with this email or username already exists"
+      );
     }
 
     const passwordHash = await bcrypt.hash(registerDto.password, 10);
     const emailVerificationToken = uuidv4();
+
+    const existingMember = await this.membersService.findByEmailOrPhone(
+      registerDto.email,
+      registerDto.phonePrimary
+    );
+
+    if (existingMember?.user) {
+      throw new BadRequestException(
+        "A member with this contact information already has an account. Please login or reset your password."
+      );
+    }
+
+    let memberId: string;
+    let memberStatus: "active" | "inactive" | "suspended" | "deceased";
+    let createdMember = false;
+
+    if (existingMember) {
+      memberId = existingMember.id;
+      memberStatus = existingMember.status;
+    } else {
+      const memberPayload = {
+        firstName: registerDto.firstName || registerDto.username,
+        lastName: registerDto.lastName || "Member",
+        phonePrimary: registerDto.phonePrimary,
+        email: registerDto.email,
+        status: "inactive" as const,
+      };
+
+      const memberResult = await this.membersService.create(memberPayload);
+      memberId = memberResult.data.id;
+      memberStatus = memberResult.data.status;
+      createdMember = true;
+    }
 
     const user = this.userRepository.create({
       username: registerDto.username,
       email: registerDto.email,
       passwordHash,
       emailVerificationToken,
-      role: 'member',
+      role: "member",
+      memberId,
     });
 
-    const savedUser = await this.userRepository.save(user);
+    let savedUser: User;
+    try {
+      savedUser = await this.userRepository.save(user);
+    } catch (error) {
+      if (createdMember) {
+        await this.membersService.remove(memberId);
+      }
+      throw error;
+    }
 
     // TODO: Send verification email
 
     return {
-      message: 'User registered successfully',
+      message: "User registered successfully",
       data: {
         id: savedUser.id,
         username: savedUser.username,
         email: savedUser.email,
+        memberId,
+        memberStatus,
       },
     };
   }
@@ -74,7 +119,7 @@ export class AuthService {
     }
 
     if (user.lockedUntil && user.lockedUntil > new Date()) {
-      throw new UnauthorizedException('Account is locked');
+      throw new UnauthorizedException("Account is locked");
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
@@ -104,7 +149,7 @@ export class AuthService {
     const refreshToken = await this.createRefreshToken(user.id);
 
     return {
-      message: 'Login successful',
+      message: "Login successful",
       data: {
         accessToken,
         refreshToken: refreshToken.token,
@@ -121,11 +166,11 @@ export class AuthService {
   async refreshToken(token: string) {
     const refreshToken = await this.refreshTokenRepository.findOne({
       where: { token },
-      relations: ['user'],
+      relations: ["user"],
     });
 
     if (!refreshToken || refreshToken.expiresAt < new Date()) {
-      throw new UnauthorizedException('Invalid or expired refresh token');
+      throw new UnauthorizedException("Invalid or expired refresh token");
     }
 
     const user = refreshToken.user;
@@ -133,7 +178,7 @@ export class AuthService {
     const accessToken = this.jwtService.sign(payload);
 
     return {
-      message: 'Token refreshed successfully',
+      message: "Token refreshed successfully",
       data: {
         accessToken,
       },
@@ -142,22 +187,22 @@ export class AuthService {
 
   async logout(userId: string) {
     await this.refreshTokenRepository.delete({ userId });
-    return { message: 'Logout successful' };
+    return { message: "Logout successful" };
   }
 
   async getProfile(userId: string) {
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['member'],
+      relations: ["member"],
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
 
     const { passwordHash, ...userWithoutPassword } = user;
     return {
-      message: 'Profile retrieved successfully',
+      message: "Profile retrieved successfully",
       data: userWithoutPassword,
     };
   }
@@ -166,22 +211,22 @@ export class AuthService {
     const user = await this.userRepository.findOne({ where: { id: userId } });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
 
     const isPasswordValid = await bcrypt.compare(
       changePasswordDto.currentPassword,
-      user.passwordHash,
+      user.passwordHash
     );
 
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Current password is incorrect');
+      throw new UnauthorizedException("Current password is incorrect");
     }
 
     user.passwordHash = await bcrypt.hash(changePasswordDto.newPassword, 10);
     await this.userRepository.save(user);
 
-    return { message: 'Password changed successfully' };
+    return { message: "Password changed successfully" };
   }
 
   async forgotPassword(email: string) {
@@ -189,7 +234,9 @@ export class AuthService {
 
     if (!user) {
       // Don't reveal if user exists
-      return { message: 'If the email exists, a password reset link has been sent' };
+      return {
+        message: "If the email exists, a password reset link has been sent",
+      };
     }
 
     const resetToken = uuidv4();
@@ -199,7 +246,9 @@ export class AuthService {
 
     // TODO: Send password reset email
 
-    return { message: 'If the email exists, a password reset link has been sent' };
+    return {
+      message: "If the email exists, a password reset link has been sent",
+    };
   }
 
   async resetPassword(resetPasswordDto: ResetPasswordDto) {
@@ -212,7 +261,7 @@ export class AuthService {
       !user.passwordResetExpires ||
       user.passwordResetExpires < new Date()
     ) {
-      throw new BadRequestException('Invalid or expired reset token');
+      throw new BadRequestException("Invalid or expired reset token");
     }
 
     user.passwordHash = await bcrypt.hash(resetPasswordDto.newPassword, 10);
@@ -220,18 +269,18 @@ export class AuthService {
     user.passwordResetExpires = null;
     await this.userRepository.save(user);
 
-    return { message: 'Password reset successfully' };
+    return { message: "Password reset successfully" };
   }
 
   async sendVerificationEmail(userId: string) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
 
     if (user.emailVerified) {
-      throw new BadRequestException('Email already verified');
+      throw new BadRequestException("Email already verified");
     }
 
     const verificationToken = uuidv4();
@@ -240,7 +289,7 @@ export class AuthService {
 
     // TODO: Send verification email
 
-    return { message: 'Verification email sent' };
+    return { message: "Verification email sent" };
   }
 
   async verifyEmail(token: string) {
@@ -249,14 +298,24 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new BadRequestException('Invalid verification token');
+      throw new BadRequestException("Invalid verification token");
     }
 
     user.emailVerified = true;
     user.emailVerificationToken = null;
     await this.userRepository.save(user);
 
-    return { message: 'Email verified successfully' };
+    return { message: "Email verified successfully" };
+  }
+
+  async checkUsernameAvailability(
+    username: string
+  ): Promise<{ available: boolean }> {
+    const user = await this.userRepository.findOne({
+      where: { username },
+    });
+
+    return { available: !user };
   }
 
   private async createRefreshToken(userId: string): Promise<RefreshToken> {
@@ -273,4 +332,3 @@ export class AuthService {
     return this.refreshTokenRepository.save(refreshToken);
   }
 }
-

@@ -21,6 +21,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { CheckUsernameDto } from './dto/check-username.dto';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -114,5 +115,13 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Email successfully verified' })
   async verifyEmail(@Param('token') token: string) {
     return this.authService.verifyEmail(token);
+  }
+
+  @Post('check-username')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Check if username is available' })
+  @ApiResponse({ status: 200, description: 'Username availability checked' })
+  async checkUsername(@Body() checkUsernameDto: CheckUsernameDto) {
+    return this.authService.checkUsernameAvailability(checkUsernameDto.username);
   }
 }
